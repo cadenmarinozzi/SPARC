@@ -1,7 +1,7 @@
 precision highp float;
 
 #define MAX_STEPS 600
-#define STEP_SIZE 0.05
+#define STEP_SIZE 0.1
 #define MAX_DISTANCE 20.0
 #define RS 1.0
 #define EPS 1e-4
@@ -9,9 +9,6 @@ precision highp float;
 varying vec2 vUv;
 uniform vec2 uResolution;
 uniform float uTime;
-
-vec3 blackHolePosition = vec3(0);
-vec3 cameraPos = vec3(0, 0, -15);
 
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -160,22 +157,6 @@ float beerLambert(float absorption, float depthTraveled) {
     return exp(-absorption * depthTraveled);
 }
 
-float rdot(float p) {
-    return p;
-}
-
-float pdot(float L, float r) {
-    return pow(L, 2.0) / pow(r, 3.0) - (3.0 * pow(L, 2.0)) / pow(L, 4.0);
-}
-
-float phidot(float L, float r) {
-    return L / pow(r, 2.0);
-}
-
-float thetadot(float L, float r) {
-    return L / pow(r, 2.0);
-}
-
 // TODO: MAKE THIS
 vec3 blackbodyRedshifted(float T, float g_total) {
     // wavelengths in meters
@@ -199,71 +180,118 @@ vec3 blackbodyRedshifted(float T, float g_total) {
     return vec3(BR, BG, BB) / maxI;
 }
 
-float mass = RS / 2.0;
-float innerRadius = 1.5 * RS + 0.01; // 3.0 * RS for physically accurate, 1.5 * RS for photon ring 
-float outerRadius = 3.0 * RS + 4.0;
-float photonRingRadius = RS * 1.5;
+vec3 dPosition(vec3 direction) {
+    return direction;
+}
 
-float diskHeight = STEP_SIZE * 7.0;
+vec3 dDirection(vec3 position, float h2) {
+    return -1.5 * h2 * position / pow(pow(length(position), 2.0), 2.5);
+}
+
+void RK4(inout vec3 position, inout vec3 direction, float h2, inout float stepSize) {
+    vec3 k1Position = dPosition(direction);
+    vec3 k1Direction = dDirection(position, h2);
+
+    vec3 k2Position = dPosition(direction + stepSize / 2.0 * k1Direction);
+    vec3 k2Direction = dDirection(position + stepSize / 2.0 * k1Position, h2);
+
+    vec3 k3Position = dPosition(direction + stepSize / 2.0 * k2Direction);
+    vec3 k3Direction = dDirection(position + stepSize / 2.0 * k2Position, h2);
+
+    vec3 k4Position = dPosition(direction + stepSize * k3Direction);
+    vec3 k4Direction = dDirection(position + stepSize * k3Position, h2);
+
+    position += (stepSize / 6.0) * (k1Position + 2.0 * k2Position + 2.0 * k3Position + k4Position);
+
+    vec3 acceleration = (stepSize / 6.0) * (k1Direction + 2.0 * k2Direction + 2.0 * k3Direction + k4Direction);
+    direction += acceleration;
+}
+
+float mass = RS / 2.0;
+float innerRadius = 1.5 * RS + EPS; // 3.0 * RS for physically accurate, 1.5 * RS for photon ring 
+float outerRadius = 1.5 * RS + 8.0; // Same here
+float photonRingRadius = RS * 1.5;
+float baseTemperature = 10000.0;
+
+vec3 blackHolePosition = vec3(0);
+vec3 cameraPos = vec3(0, 0, -15);
+
+float diskHeight = 0.6;
+
+bool relativisticPaths = true;
+
+void sampleDisk(inout vec3 color, inout float accumTransmittance, float density, float safeDist, vec3 direction, vec3 position, float stepSize) {
+    float emission = density * 20.0;
+    float absorption = density * 0.01;
+
+    float observerVelocity2 = 1.0 - 1.0 / length(cameraPos);
+    float emittedVelocity2 = 1.0 - 1.0 / safeDist;
+    float gravitationalRedshift = sqrt(emittedVelocity2 / observerVelocity2);
+
+    float diskPointVelocity = clamp(sqrt(mass / (safeDist - 1.0)), 0.0, 1.0); // Velocity of the particle of matter in the accretion disk
+    float gamma = 1.0 / sqrt(1.0 - pow(diskPointVelocity, 2.0));
+    vec3 normalVelocity = relativisticPaths ? normalize(direction) : normalize(cameraPos - position);
+    vec3 tangentialVelocity = vec3(-position.z / safeDist, 0, position.x / safeDist);
+    float dopplerRedshift = 1.0 / (gamma * (1.0 - diskPointVelocity * dot(tangentialVelocity, normalVelocity)));
+
+    float totalRedshiftFactor = dopplerRedshift * gravitationalRedshift;
+    float scaledRedshiftFactor = pow(totalRedshiftFactor, 3.0); // Scaled for visual purposes. for physically accurate, don't scale
+
+    float transmittance = beerLambert(absorption, stepSize);
+
+    float T = baseTemperature * pow(safeDist / innerRadius, -0.75);
+
+    vec3 bbColor = blackbodyRedshifted(T, 1.0 / totalRedshiftFactor);
+
+    accumTransmittance *= transmittance;
+    color += bbColor * emission * scaledRedshiftFactor * accumTransmittance * stepSize;
+}
 
 vec3 rayMarch(vec3 position, vec3 direction) {
     vec3 color = vec3(0);
     float accumTransmittance = 1.0; // Accumulated amount of light gone through
 
+    float h2 = pow(length(cross(position, direction)), 2.0);
+
+    float stepSize = STEP_SIZE;
+
     for (int i = 0; i < MAX_STEPS; i++) {
         float dist = length(position);
 
-        if (dist > MAX_DISTANCE) {
+        if (dist > MAX_DISTANCE)
             break;
+
+        if (dist < photonRingRadius)
+            break;
+
+        // Reduce FBM spikes near event horizon
+        if (dist <= innerRadius * 1.1) {
+            stepSize = STEP_SIZE * 2.0;
+        } else {
+            stepSize = STEP_SIZE;
         }
 
-        if (dist < photonRingRadius) {
-            break;
-        }
+        float safeDist = max(dist, innerRadius + EPS);
 
         float pointTheta = atan(position.z, position.x);
 
-        float speed = -2.0 / dist;
+        float speed = (relativisticPaths ? 2.0 : -2.0) / safeDist;
         float shift = uTime * speed;
-        vec3 vortexPosition = vec3(dist * cos(pointTheta + shift), position.y, dist * sin(pointTheta + shift));
+        vec3 vortexPosition = vec3(safeDist * cos(pointTheta + shift), position.y, safeDist * sin(pointTheta + shift));
 
         float noise = fbm(vortexPosition, 0.5, 4);
-        float density = (noise / 10.0 + 10.0) * (1.0 / dist);
+        float density = (noise / 10.0 + 10.0) * (1.0 / safeDist);
         float depth = noise / 2.0;
 
-        float h2 = pow(length(cross(position, direction)), 2.0);
-
         if (abs(position.y) < diskHeight + depth && length(position.xz) < outerRadius + depth && length(position.xz) > innerRadius + depth) {
-            float emission = density * 20.0;
-            float absorption = density * 0.01;
-
-            float safeRadius = max(dist, innerRadius + EPS);
-
-            float observerVelocity2 = 1.0 - 1.0 / length(cameraPos);
-            float emittedVelocity2 = 1.0 - 1.0 / safeRadius;
-            float gravitationalRedshift = sqrt(emittedVelocity2 / observerVelocity2);
-
-            float diskPointVelocity = clamp(sqrt(mass / (safeRadius - 1.0)), 0.0, 1.0); // Velocity of the particle of matter in the accretion disk
-            float gamma = 1.0 / sqrt(1.0 - pow(diskPointVelocity, 2.0));
-            vec3 normalVelocity = normalize(cameraPos - position);
-            vec3 tangentialVelocity = vec3(-position.z / safeRadius, 0, position.x / safeRadius);
-            float dopplerRedshift = 1.0 / (gamma * (1.0 - diskPointVelocity * dot(tangentialVelocity, normalVelocity)));
-
-            float totalRedshiftFactor = dopplerRedshift * gravitationalRedshift;
-            float scaledRedshiftFactor = pow(totalRedshiftFactor, 3.0); // Scaled for visual purposes. for physically accurate, don't scale
-
-            float transmittance = beerLambert(absorption, STEP_SIZE);
-
-            float T = 10000.0 * pow(safeRadius / innerRadius, -0.75);
-
-            vec3 bbColor = blackbodyRedshifted(T, 1.0 / totalRedshiftFactor);
-
-            color += bbColor * emission * scaledRedshiftFactor * accumTransmittance * STEP_SIZE;
-            accumTransmittance *= transmittance;
+            sampleDisk(color, accumTransmittance, density, safeDist, direction, position, stepSize);
         }
 
-        direction += -1.5 * h2 * position / pow(pow(dist, 2.0), 2.5) * STEP_SIZE;
-        position += direction * STEP_SIZE;
+        if (relativisticPaths) {
+            RK4(position, direction, h2, stepSize);
+        } else {
+            position += direction * stepSize;
+        }
     }
 
     return clamp(color / float(MAX_STEPS), 0.0, 1.0);
@@ -281,8 +309,8 @@ vec3 gammaCorrect(vec3 color, float gamma) {
 
 void main() {
     vec2 uv = vec2((vUv.x - 0.5) * (uResolution.x / uResolution.y), (vUv.y - 0.5));
-    vec3 lookAt = vec3(sin(uTime / 2.0) * 0.5, 0, 0);
-    // vec3 lookAt = vec3(0.2, 0, 0);
+    // vec3 lookAt = vec3(sin(uTime / 2.0) * 1.0 + 1.0, 0, 0);
+    vec3 lookAt = vec3(0.2, 0, 0);
 
     vec3 position = rotate(cameraPos, lookAt);
     vec3 direction = normalize(rotate(vec3(uv, 1), lookAt));
