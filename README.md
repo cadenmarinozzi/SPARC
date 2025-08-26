@@ -1,4 +1,4 @@
-# SPARC - Spacetime Analysis and Ray-tracing Code
+# SPARC - Spacetime Analysis and Radiative Transfer Code
 
 SPARC is a web based GRRT code designed for simulating and visualizing accurate, physically-based simulations of gravitational lensing and other relativistic effects.
 
