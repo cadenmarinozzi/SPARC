@@ -216,7 +216,7 @@ float outerRadius = 1.5 * RS + 8.0; // Same here
 float photonRingRadius = RS * 1.5;
 float diskHeight = 0.6;
 
-void sampleDisk(inout vec3 color, inout float accumTransmittance, float density, float dist, vec3 direction, vec3 position, float stepSize) {
+void radiativeTransferSample(inout vec3 color, inout float accumTransmittance, float density, float dist, vec3 direction, vec3 position, float stepSize) {
     float emission = density * 20.0;
     float absorption = density * 0.01;
 
@@ -280,7 +280,7 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         float depth = noise / 2.0;
 
         if (abs(position.y) < diskHeight + depth && length(position.xz) < outerRadius + depth && length(position.xz) > innerRadius + depth) {
-            sampleDisk(color, accumTransmittance, density, safeDist, direction, position, stepSize);
+            radiativeTransferSample(color, accumTransmittance, density, safeDist, direction, position, stepSize);
         }
 
         if (uRelativisticPaths) {
