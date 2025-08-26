@@ -1,17 +1,23 @@
 precision highp float;
 
-#define MAX_STEPS 600
-#define STEP_SIZE 0.1
-#define MAX_DISTANCE 20.0
-#define RS 1.0
-#define EPS 1e-4
-
 varying vec2 vUv;
 uniform vec2 uResolution;
 uniform vec3 uCameraPosition;
 uniform bool uRelativisticPaths;
 uniform float uBaseTemperature;
+uniform int uMaxSteps;
+uniform float uInitialStepSize;
+uniform float uMaxDistance;
 uniform float uTime;
+uniform float uMass;
+uniform float uEPS;
+uniform float uSchwarzschildRadius;
+uniform float uDiskHeight;
+uniform float uPhotonRingRadius;
+uniform float uInnerRadius;
+uniform float uOuterRadius;
+uniform float uEmissionCoefficient;
+uniform float uAbsorptionCoefficient;
 
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -188,7 +194,7 @@ vec3 dPosition(vec3 direction) {
 }
 
 vec3 dDirection(vec3 position, float h2) {
-    return -1.5 * h2 * position / pow(pow(length(position), 2.0), 2.5);
+    return -1.5 * uSchwarzschildRadius * h2 * position / pow(pow(length(position), 2.0), 2.5);
 }
 
 void RK4(inout vec3 position, inout vec3 direction, float h2, inout float stepSize) {
@@ -210,21 +216,15 @@ void RK4(inout vec3 position, inout vec3 direction, float h2, inout float stepSi
     direction += acceleration;
 }
 
-float mass = RS / 2.0;
-float innerRadius = 1.5 * RS + EPS; // 3.0 * RS for physically accurate, 1.5 * RS for photon ring 
-float outerRadius = 1.5 * RS + 8.0; // Same here
-float photonRingRadius = RS * 1.5;
-float diskHeight = 0.6;
-
 void radiativeTransferSample(inout vec3 color, inout float accumTransmittance, float density, float dist, vec3 direction, vec3 position, float stepSize) {
-    float emission = density * 20.0;
-    float absorption = density * 0.01;
+    float emission = density * uEmissionCoefficient;
+    float absorption = density * uAbsorptionCoefficient;
 
     float observerVelocity2 = 1.0 - 1.0 / length(uCameraPosition);
     float emittedVelocity2 = 1.0 - 1.0 / dist;
     float gravitationalRedshift = sqrt(emittedVelocity2 / observerVelocity2);
 
-    float diskPointVelocity = clamp(sqrt(mass / (dist - 1.0)), 0.0, 1.0); // Velocity of the particle of matter in the accretion disk
+    float diskPointVelocity = clamp(sqrt(uMass / (dist - 1.0)), 0.0, 1.0); // Velocity of the particle of matter in the accretion disk
     float gamma = 1.0 / sqrt(1.0 - pow(diskPointVelocity, 2.0));
     vec3 normalVelocity = uRelativisticPaths ? normalize(direction) : normalize(uCameraPosition - position);
     vec3 tangentialVelocity = vec3(-position.z / dist, 0, position.x / dist);
@@ -235,7 +235,7 @@ void radiativeTransferSample(inout vec3 color, inout float accumTransmittance, f
 
     float transmittance = beerLambert(absorption, stepSize);
 
-    float T = uBaseTemperature * pow(dist / innerRadius, -0.75);
+    float T = uBaseTemperature * pow(dist / uInnerRadius, -0.75);
 
     vec3 bbColor = blackbodyRedshifted(T, 1.0 / totalRedshiftFactor);
 
@@ -249,25 +249,25 @@ vec3 rayMarch(vec3 position, vec3 direction) {
 
     float h2 = pow(length(cross(position, direction)), 2.0);
 
-    float stepSize = STEP_SIZE;
+    float stepSize = uInitialStepSize;
 
-    for (int i = 0; i < MAX_STEPS; i++) {
+    for (int i = 0; i < uMaxSteps; i++) {
         float dist = length(position);
 
-        if (dist > MAX_DISTANCE)
+        if (dist > uMaxDistance)
             break;
 
-        if (dist < photonRingRadius)
+        if (dist < uPhotonRingRadius)
             break;
 
         // Reduce FBM spikes near event horizon
-        if (dist <= innerRadius * 1.1) {
-            stepSize = STEP_SIZE * 2.0;
+        if (dist <= uInnerRadius * 1.1) {
+            stepSize = uInitialStepSize * 2.0;
         } else {
-            stepSize = STEP_SIZE;
+            stepSize = uInitialStepSize;
         }
 
-        float safeDist = max(dist, innerRadius + EPS);
+        float safeDist = max(dist, uInnerRadius + uEPS);
 
         float pointTheta = atan(position.z, position.x);
 
@@ -279,7 +279,7 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         float density = (noise / 10.0 + 10.0) * (1.0 / safeDist);
         float depth = noise / 2.0;
 
-        if (abs(position.y) < diskHeight + depth && length(position.xz) < outerRadius + depth && length(position.xz) > innerRadius + depth) {
+        if (abs(position.y) < uDiskHeight + depth && length(position.xz) < uOuterRadius + depth && length(position.xz) > uInnerRadius + depth) {
             radiativeTransferSample(color, accumTransmittance, density, safeDist, direction, position, stepSize);
         }
 
@@ -290,17 +290,13 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         }
     }
 
-    return clamp(color / float(MAX_STEPS), 0.0, 1.0);
+    return color / float(uMaxSteps);
 }
 
 vec3 linearToLog(vec3 color, float a) {
     color = max(color, vec3(0.0));
 
     return log(1.0 + a * color) / log(1.0 + a);
-}
-
-vec3 gammaCorrect(vec3 color, float gamma) {
-    return pow(color, vec3(1.0 / gamma));
 }
 
 void main() {
@@ -312,9 +308,7 @@ void main() {
     vec3 direction = normalize(rotate(vec3(uv, 1), lookAt));
 
     vec3 color = rayMarch(position, direction);
-
     vec3 logColor = linearToLog(color, 5.0);
-    // vec3 gammaCorrectedColor = gammaCorrect(logColor, 2.2);
 
     gl_FragColor = vec4(logColor, 1);
 }

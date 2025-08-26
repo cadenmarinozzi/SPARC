@@ -5,12 +5,46 @@
       * {
         margin: 0;
         padding: 0;
+
+        background: black;
+        color: white;
+      }
+
+      button {
+        padding: 4px;
+
+        border: 1px solid gray;
+        border-radius: 6px;
+
+        cursor: pointer;
+
+        z-index: 2;
+
+        transition: all;
+        transition-duration: 100ms;
+      }
+
+      button:hover {
+        transform: scale(95%);
       }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SPARC</title>
   </head>
   <body>
-    <script type="module" src="src/main.js"></script>
+    <script>
+      const ws = new WebSocket("ws://localhost:3000");
+
+      ws.addEventListener("message", (event) => {
+        if (event.data === "reload") {
+          console.log("Reloading page...");
+          window.location.reload();
+        }
+      });
+    </script>
+    <div>
+      <button style="display: none">Download</button>
+    </div>
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>

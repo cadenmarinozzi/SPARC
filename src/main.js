@@ -1,8 +1,12 @@
+import { saveAs } from "file-saver";
+import JSZip from "jszip";
 import * as THREE from "three";
 import config from "./config.js";
 
-const windowWidth = window.innerWidth / 2;
-const windowHeight = window.innerHeight / 2;
+const windowWidth = config.rendering.width;
+const windowHeight = config.rendering.height;
+
+const MS_IN_SECOND = 1000;
 
 function createCombineFragmentShader() {
   const passNames = Object.keys(config.passes);
@@ -28,12 +32,31 @@ function createCombineFragmentShader() {
 }
 
 config.passes.blackHole = {
-  fragmentShader: "shaders/blackHoleFrag.glsl",
+  fragmentShader: "/shaders/blackHoleFrag.glsl",
   uniforms: {
     uResolution: { value: null },
     uCameraPosition: { value: config.scene.camera.position },
     uRelativisticPaths: { value: config.scene.relativisticPaths },
     uBaseTemperature: { value: config.scene.blackHole.baseTemperature },
+    uMaxSteps: { value: config.scene.maxSteps },
+    uInitialStepSize: { value: config.scene.initialStepSize },
+    uMaxDistance: { value: config.scene.maxDistance },
+    uSchwarzschildRadius: { value: config.scene.schwarzschildRadius },
+    uMass: { value: config.scene.schwarzschildRadius / 2.0 },
+    uDiskHeight: { value: 0.6 },
+    uPhotonRingRadius: { value: config.scene.schwarzschildRadius * 1.5 },
+    uInnerRadius: {
+      value: config.scene.schwarzschildRadius * 1.5 + config.scene.EPS,
+    },
+    uOuterRadius: {
+      value: config.scene.schwarzschildRadius * 1.5 + 8,
+    },
+    uEmissionCoefficient: {
+      value: config.scene.blackHole.emissionCoefficient,
+    },
+    uAbsorptionCoefficient: {
+      value: config.scene.blackHole.absorptionCoefficient,
+    },
     uTime: { value: null },
   },
 };
@@ -52,22 +75,22 @@ config.passes.combine = {
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const geometry = new THREE.PlaneGeometry(2, 2);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  preserveDrawingBuffer: true,
+});
 renderer.setSize(windowWidth, windowHeight);
 renderer.domElement.style = "width: 100%; height: 100%;";
 document.body.appendChild(renderer.domElement);
 
-const MS_IN_SECOND = 1000;
-
 async function fetchShader(file) {
-  const result = await fetch(file);
+  const result = await fetch(`${file}?t=${Date.now()}`);
   const body = await result.text();
 
   return body;
 }
 
 async function load() {
-  const vertexShader = await fetchShader("shaders/vert.glsl");
+  const vertexShader = await fetchShader("/shaders/vert.glsl");
   const passes = {};
 
   for (const [
@@ -100,6 +123,8 @@ async function load() {
     };
   }
 
+  const frames = [];
+
   function render(t) {
     const timeSeconds = t / MS_IN_SECOND;
 
@@ -130,16 +155,63 @@ async function load() {
       }
 
       renderer.render(scene, camera);
+
+      if (config.rendering.shouldAnimate && config.rendering.output.save) {
+        const imageType = config.rendering.output.video.imageType;
+        const frame = renderer.domElement.toDataURL(`image/${imageType}`);
+        frames.push(frame);
+      }
     }
+  }
+
+  async function download() {
+    if (config.rendering.shouldAnimate) {
+      const imageType = config.rendering.output.video.imageType;
+
+      const zip = new JSZip();
+      const folder = zip.folder("images");
+
+      for (const [index, frame] of frames.entries()) {
+        const data = frame.replace(/^data:image\/\w+;base64,/, "");
+        const fileName = `${index.toString().padStart(4, "0")}.${imageType}`;
+
+        folder.file(fileName, data, {
+          base64: true,
+        });
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, "images.zip");
+    } else {
+      const imageType = config.rendering.output.image.type;
+      renderer.domElement.toBlob((blob) => saveAs(blob, `output.${imageType}`));
+    }
+  }
+
+  function handleAnimationFinished() {
+    const downloadButton = document.querySelector("button");
+    downloadButton.style.display = "block";
+    downloadButton.addEventListener("click", download);
   }
 
   function animate(t = config.scene.initialTime) {
     render(t);
 
-    if (config.rendering.shouldAnimate)
-      setTimeout(() => {
-        animate(t + config.rendering.delayMs);
-      }, config.rendering.delayMs);
+    if (t >= config.scene.duration || !config.rendering.shouldAnimate) {
+      handleAnimationFinished();
+
+      return;
+    }
+
+    if (!config.rendering.shouldAnimate) return;
+
+    const delayMs = config.rendering.delayMs;
+
+    if (delayMs && delayMs > 0) {
+      setTimeout(() => animate(t + delayMs), delayMs);
+    } else {
+      requestAnimationFrame(animate);
+    }
   }
 
   animate();

@@ -23,8 +23,8 @@ npm install
 
 Edit the configuration files in the `src/config` directory to set up your simulation parameters.
 
-4. Start the development server:
+4. Start the reload watcher and development server:
 
 ```sh
-npm run dev
+npm run watch & npm run dev
 ```
