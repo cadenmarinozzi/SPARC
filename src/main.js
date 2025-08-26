@@ -28,7 +28,7 @@ function createCombineFragmentShader() {
 }
 
 config.passes.blackHole = {
-  fragmentShader: "/src/shaders/blackHoleFrag.glsl",
+  fragmentShader: "shaders/blackHoleFrag.glsl",
   uniforms: {
     uResolution: { value: null },
     uCameraPosition: { value: config.scene.camera.position },
@@ -67,7 +67,7 @@ async function fetchShader(file) {
 }
 
 async function load() {
-  const vertexShader = await fetchShader("/src/shaders/vert.glsl");
+  const vertexShader = await fetchShader("shaders/vert.glsl");
   const passes = {};
 
   for (const [
