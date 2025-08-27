@@ -19,6 +19,8 @@ uniform float uOuterRadius;
 uniform float uEmissionCoefficient;
 uniform float uAbsorptionCoefficient;
 
+uniform sampler3D diskTexture;
+
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
@@ -279,8 +281,13 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         float density = (noise / 10.0 + 10.0) * (1.0 / safeDist);
         float depth = noise / 2.0;
 
+        // vec3 texPos = (position + 1.0) / 2.0; // maps [-1,1] → [0,1]
+        // float dens = textureCube(diskTexture, vUv.xyz).r;
+
+        // if (dens > 0.0) {
         if (abs(position.y) < uDiskHeight + depth && length(position.xz) < uOuterRadius + depth && length(position.xz) > uInnerRadius + depth) {
             radiativeTransferSample(color, accumTransmittance, density, safeDist, direction, position, stepSize);
+            // return vec3(1);
         }
 
         if (uRelativisticPaths) {

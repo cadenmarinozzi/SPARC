@@ -3,8 +3,8 @@ import JSZip from "jszip";
 import * as THREE from "three";
 import config from "./config.js";
 
-const windowWidth = config.rendering.width;
-const windowHeight = config.rendering.height;
+const windowWidth = config.rendering.resolution.width;
+const windowHeight = config.rendering.resolution.height;
 
 const MS_IN_SECOND = 1000;
 
@@ -31,8 +31,8 @@ function createCombineFragmentShader() {
   }`;
 }
 
-config.passes.blackHole = {
-  fragmentShader: "/shaders/blackHoleFrag.glsl",
+config.passes.radiativeTransfer = {
+  fragmentShader: "/shaders/radiativeTransfer.glsl",
   uniforms: {
     uResolution: { value: null },
     uCameraPosition: { value: config.scene.camera.position },
@@ -123,6 +123,47 @@ async function load() {
     };
   }
 
+  const Nx = 64; // x grid size
+  const Ny = 64; // y grid size
+  const Nz = 64; // z grid size
+  const R = 0.3; // torus major radius (normalized 0..1)
+  const r = 0.1; // torus minor radius (thickness)
+
+  // -----------------------------
+  // Create data array (RGBA)
+  // -----------------------------
+  const dataArray = new Float32Array(Nx * Ny * Nz * 4);
+
+  for (let i = 0; i < Nx; i++) {
+    const x = (i / (Nx - 1)) * 2 - 1; // normalize -1..1
+    for (let j = 0; j < Ny; j++) {
+      const y = (j / (Ny - 1)) * 2 - 1;
+      for (let k = 0; k < Nz; k++) {
+        const z = (k / (Nz - 1)) * 2 - 1;
+
+        // distance from torus center
+        const rho = Math.sqrt(x * x + z * z);
+        const dist = Math.sqrt((rho - R) ** 2 + y * y);
+
+        // Simple torus: 1 inside, 0 outside
+        const value = dist < r ? 1.0 : 0.0;
+
+        const idx = 4 * (i * Ny * Nz + j * Nz + k);
+        dataArray[idx + 0] = value; // R channel -> density
+        dataArray[idx + 1] = 0.5; // G channel -> temperature
+        dataArray[idx + 2] = 0.0; // B channel -> velocity placeholder
+        dataArray[idx + 3] = 0.0; // A channel -> B-field placeholder
+      }
+    }
+  }
+
+  const texture = new THREE.Data3DTexture(dataArray, Nx, Ny, Nz);
+  texture.format = THREE.RGBAFormat;
+  texture.type = THREE.FloatType;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.unpackAlignment = 1;
+
   const frames = [];
 
   function render(t) {
@@ -151,6 +192,7 @@ async function load() {
 
         renderer.setRenderTarget(null);
       } else {
+        material.uniforms.diskTexture = texture;
         renderer.setRenderTarget(renderTarget);
       }
 

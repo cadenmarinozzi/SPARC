@@ -4,7 +4,7 @@ export default {
   passes: {},
   scene: {
     initialTime: 0,
-    duration: 1000,
+    duration: 50000,
     maxSteps: 600,
     initialStepSize: 0.08,
     maxDistance: 40,
@@ -22,9 +22,11 @@ export default {
     },
   },
   rendering: {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    delayMs: 100,
+    resolution: {
+      width: 1920,
+      height: 1080,
+    },
+    delayMs: 0,
     shouldAnimate: false,
     output: {
       save: true,

@@ -23,8 +23,14 @@ npm install
 
 Edit the configuration files in the `src/config` directory to set up your simulation parameters.
 
-4. Start the reload watcher and development server:
+4. Start the reload watcher and server:
 
 ```sh
 npm run watch & npm run dev
+```
+
+5. After the simulation is finished, download the frames and convert the output images to a video if desired:
+
+```sh
+node scripts/imagesToVideo.js <path_to_downloaded_frames> <output_video_path> <framerate>
 ```
