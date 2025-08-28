@@ -1,8 +1,8 @@
 import config from "./config.js";
 import { createDefaultConfigPasses } from "./passes/index.js";
-import Simulation from "./simulation/index.js";
+import Simulation from "./simulation.js";
 
-createDefaultConfigPasses(config);
+createDefaultConfigPasses();
 
 const simulation = new Simulation();
 

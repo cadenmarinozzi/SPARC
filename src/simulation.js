@@ -1,10 +1,10 @@
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import * as THREE from "three";
-import config from "../config";
-import { MS_IN_SECOND } from "../constants";
-import { fetchShader } from "../IO/assets";
-import { readH5File } from "../IO/hdf5";
+import config from "./config";
+import { MS_IN_SECOND } from "./constants";
+import { fetchShader } from "./IO/assets";
+import { readH5File } from "./IO/hdf5";
 
 export default class Simulation {
   constructor() {
@@ -75,7 +75,7 @@ export default class Simulation {
     const N = size * size;
 
     for (let i = 0; i < nTimeFrames; i++) {
-      const rhoSlice = rho.slice(i * N, (i + 1) * N);
+      const rhoSlice = rho.slice(i * N, (i + 1) * N).map((x) => x * 20);
 
       const data = new Float32Array(N);
       data.set(rhoSlice);
