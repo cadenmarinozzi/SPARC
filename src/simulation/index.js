@@ -14,6 +14,8 @@ export default class Simulation {
     this.windowWidth = config.rendering.resolution.width;
     this.windowHeight = config.rendering.resolution.height;
 
+    this.resolution = new THREE.Vector2(this.windowWidth, this.windowHeight);
+
     this.frames = [];
 
     this.nTimeFrames = null;
@@ -24,17 +26,14 @@ export default class Simulation {
 
     this.timeTextures = [];
 
-    this.passes = {};
+    this.passes = [];
   }
 
-  async createPasses() {
+  createPasses = async () => {
     const vertexShader = await fetchShader("/shaders/vert.glsl");
     const geometry = new THREE.PlaneGeometry(2, 2);
 
-    for (const [
-      passName,
-      { uniforms, fragmentShader, isCombine },
-    ] of Object.entries(config.passes)) {
+    for (const { name, uniforms, fragmentShader, isCombine } of config.passes) {
       const shaderSource = isCombine
         ? fragmentShader
         : await fetchShader(fragmentShader);
@@ -54,18 +53,19 @@ export default class Simulation {
       const scene = new THREE.Scene();
       scene.add(quad);
 
-      this.passes[passName] = {
+      this.passes.push({
+        name,
         shader,
         quad,
         scene,
         renderTarget,
         material,
         isCombine,
-      };
+      });
     }
-  }
+  };
 
-  async readInputData() {
+  readInputData = async () => {
     const { rho, t } = await readH5File(config.scene.blackHole.inputDataPath);
 
     const nTimeFrames = t.length;
@@ -90,9 +90,9 @@ export default class Simulation {
 
       this.timeTextures.push(texture);
     }
-  }
+  };
 
-  initRenderer() {
+  initRenderer = () => {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.renderer = new THREE.WebGLRenderer({
       preserveDrawingBuffer: true,
@@ -101,77 +101,9 @@ export default class Simulation {
     this.renderer.setSize(this.windowWidth, this.windowHeight);
     this.renderer.domElement.style = "width: 100%; height: 100%;";
     document.body.appendChild(this.renderer.domElement);
-  }
+  };
 
-  handleRenderPass({ renderTarget, scene, material, isCombine }) {
-    const timeSeconds = this.timeElapsed / MS_IN_SECOND;
-
-    if (material.uniforms.uTime) {
-      material.uniforms.uTime.value = timeSeconds;
-    }
-
-    const resolution = new THREE.Vector2(this.windowWidth, this.windowHeight);
-
-    if (
-      material.uniforms.uResolution &&
-      material.uniforms.uResolution.value !== resolution
-    ) {
-      material.uniforms.uResolution.value = resolution;
-    }
-
-    const currentInputTexture = this.timeTextures[this.timeIndex];
-
-    if (
-      config.scene.blackHole.useInputTexture &&
-      this.timeIndex < this.nTimeFrames &&
-      material.uniforms.uInputTexture &&
-      material.uniforms.uInputTexture !== currentInputTexture
-    ) {
-      material.uniforms.uInputTexture.value = currentInputTexture;
-    }
-
-    if (isCombine) {
-      for (const [
-        otherPassName,
-        { renderTarget: otherRenderTarget, isCombine: otherIsCombine },
-      ] of Object.entries(this.passes)) {
-        if (otherIsCombine) continue;
-
-        material.uniforms[`t${otherPassName}`].value =
-          otherRenderTarget.texture;
-      }
-
-      this.renderer.setRenderTarget(null);
-    } else {
-      this.renderer.setRenderTarget(renderTarget);
-    }
-
-    this.renderer.render(scene, this.camera);
-
-    if (config.rendering.shouldAnimate && config.rendering.output.save) {
-      const imageType = config.rendering.output.video.imageType;
-      const frame = this.renderer.domElement.toDataURL(`image/${imageType}`);
-      this.frames.push(frame);
-    }
-  }
-
-  render() {
-    const renderStartTime = performance.now();
-
-    this.timeIndex++;
-
-    for (const pass of Object.values(this.passes)) {
-      this.handleRenderPass(pass);
-    }
-
-    const renderEndTime = performance.now();
-    const deltaTime = renderEndTime - renderStartTime;
-
-    if (config.debug)
-      console.log(`Frame took ${deltaTime / MS_IN_SECOND} seconds to render`);
-  }
-
-  async download() {
+  download = async () => {
     if (config.rendering.shouldAnimate) {
       const imageType = config.rendering.output.video.imageType;
 
@@ -195,15 +127,81 @@ export default class Simulation {
         saveAs(blob, `output.${imageType}`)
       );
     }
-  }
+  };
 
-  handleAnimationFinished() {
+  handleAnimationFinished = () => {
     const downloadButton = document.querySelector("button");
     downloadButton.style.display = "block";
     downloadButton.addEventListener("click", this.download);
-  }
+  };
 
-  animate(t = this.timeElapsed) {
+  handleRenderPass = (pass) => {
+    const { renderTarget, scene, material, isCombine } = pass;
+    const timeSeconds = this.timeElapsed / MS_IN_SECOND;
+
+    if (material.uniforms.uTime) {
+      material.uniforms.uTime.value = timeSeconds;
+    }
+
+    if (
+      config.scene.blackHole.useInputTexture &&
+      this.timeIndex < this.nTimeFrames &&
+      material.uniforms.uInputTexture &&
+      material.uniforms.uInputTexture !== this.timeTextures[this.timeIndex]
+    ) {
+      material.uniforms.uInputTexture.value = this.timeTextures[this.timeIndex];
+    }
+
+    if (
+      material.uniforms.uResolution &&
+      material.uniforms.uResolution.value !== this.resolution
+    ) {
+      material.uniforms.uResolution.value = this.resolution;
+    }
+
+    if (isCombine) {
+      for (const {
+        name: otherName,
+        renderTarget: otherRenderTarget,
+        isCombine: otherIsCombine,
+      } of this.passes) {
+        if (otherIsCombine) continue;
+
+        material.uniforms[`t${otherName}`].value = otherRenderTarget.texture;
+      }
+
+      this.renderer.setRenderTarget(null);
+      this.renderer.render(scene, this.camera);
+
+      return;
+    }
+
+    this.renderer.setRenderTarget(renderTarget);
+    this.renderer.render(scene, this.camera);
+  };
+
+  render = async () => {
+    const renderStartTime = performance.now();
+    this.timeIndex++;
+
+    for (const pass of this.passes) {
+      this.handleRenderPass(pass);
+
+      if (config.rendering.shouldAnimate && config.rendering.output.save) {
+        const imageType = config.rendering.output.video.imageType;
+        const frame = this.renderer.domElement.toDataURL(`image/${imageType}`);
+        this.frames.push(frame);
+      }
+    }
+
+    const renderEndTime = performance.now();
+    const deltaTime = renderEndTime - renderStartTime;
+
+    if (config.debug)
+      console.log(`Frame took ${deltaTime / MS_IN_SECOND} seconds to render`);
+  };
+
+  animate = (t = this.timeElapsed) => {
     this.timeElapsed = t;
     this.render();
 
@@ -223,9 +221,19 @@ export default class Simulation {
     const delayMs = config.rendering.delayMs;
 
     if (delayMs && delayMs > 0) {
-      setTimeout(() => this.animate(t + delayMs), delayMs);
+      const nextFrame = t + delayMs;
+
+      const loop = (t) => {
+        if (t >= nextFrame) {
+          this.animate(t);
+        } else {
+          requestAnimationFrame(loop);
+        }
+      };
+
+      requestAnimationFrame(loop);
     } else {
       requestAnimationFrame((t) => this.animate(t + config.scene.initialTime));
     }
-  }
+  };
 }

@@ -1,7 +1,8 @@
 import { createCombineFragmentShader } from "./utils";
 
 export function createDefaultConfigPasses(config) {
-  config.passes.radiativeTransfer = {
+  config.passes.push({
+    name: "radiativeTransfer",
     fragmentShader: "/shaders/radiativeTransfer.glsl",
     uniforms: {
       uInputTexture: { value: null },
@@ -37,16 +38,14 @@ export function createDefaultConfigPasses(config) {
       },
       uTime: { value: null },
     },
-  };
+  });
 
-  config.passes.combine = {
+  config.passes.push({
+    name: "combine",
     isCombine: true,
     fragmentShader: createCombineFragmentShader(config.passes),
     uniforms: Object.fromEntries(
-      Object.keys(config.passes).map((passName) => [
-        `t${passName}`,
-        { value: null },
-      ])
+      config.passes.map(({ name }) => [`t${name}`, { value: null }])
     ),
-  };
+  });
 }

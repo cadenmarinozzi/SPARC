@@ -283,10 +283,10 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         bool inVolume = false;
 
         if (uUseInputTexture) {
-            vec2 textureCoords = (position.xz + 20.0) / 40.0;
+            vec2 textureCoords = (vortexPosition.xz + 20.0) / 40.0;
             density = texture(uInputTexture, textureCoords).r * 20.0;
 
-            inVolume = density > 0.0 && abs(position.y) < 0.2;
+            inVolume = density > 0.0 && abs(position.y) < 0.02;
         } else {
             float noise = fbm(vortexPosition, 0.5, 4);
             float depth = noise / 2.0;

@@ -1,8 +1,8 @@
 import * as THREE from "three";
 
 export default {
-  debug: true,
-  passes: {},
+  debug: false,
+  passes: [],
   scene: {
     initialTime: 0,
     duration: 0,
@@ -17,9 +17,8 @@ export default {
     },
     blackHole: {
       schwarzschildRadius: 1.0,
-      useInputTexture: true,
+      useInputTexture: false,
       inputDataPath: "/inputs/grmhd_history.h5",
-      position: new THREE.Vector3(0, 0, 0),
       baseTemperature: 10000,
       emissionCoefficient: 10,
       absorptionCoefficient: 0.01,
@@ -27,11 +26,11 @@ export default {
   },
   rendering: {
     resolution: {
-      width: 300, //window.innerWidth,
-      height: 300 * (window.innerHeight / window.innerWidth), //window.innerHeight,
+      width: window.innerWidth / 2, //300, //window.innerWidth,
+      height: window.innerHeight / 2, //300 * (window.innerHeight / window.innerWidth), //window.innerHeight,
     },
-    delayMs: 0,
-    shouldAnimate: false,
+    delayMs: 100,
+    shouldAnimate: true,
     output: {
       save: false,
       image: {

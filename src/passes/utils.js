@@ -1,5 +1,5 @@
 export function createCombineFragmentShader(passes) {
-  const passNames = Object.keys(passes);
+  const passNames = passes.map(({ name }) => name);
 
   return `
   ${passNames.map((passName) => `uniform sampler2D t${passName};`).join("\n")}
