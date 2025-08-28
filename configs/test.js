@@ -4,7 +4,7 @@ export default {
   debug: false,
   passes: [],
   scene: {
-    initialTime: 2000,
+    initialTime: 6000,
     duration: 0,
     maxSteps: 5000,
     speedScale: 5,
@@ -14,17 +14,17 @@ export default {
     gravitationalConstant: 1,
     EPS: 1e-4,
     relativisticPaths: true,
-    brightnessScale: 15000,
+    brightnessScale: 5000,
     observerFrequency: 0.0009,
     camera: {
-      position: new THREE.Vector3(0, 0, -40),
+      position: new THREE.Vector3(0, 0, -30),
       rotation: new THREE.Vector3(0.5, 0, 0),
     },
     blackHole: {
       diskHeight: 0.3,
       schwarzschildRadius: 1,
       useInputTexture: false,
-      thickDisk: false,
+      thickDisk: true,
       inputDataHeight: 0.2,
       inputDataPath: "/inputs/grmhd_history.h5",
       baseTemperature: 10000,
@@ -35,8 +35,8 @@ export default {
   rendering: {
     logFactor: 5,
     resolution: {
-      width: 1000, // window.innerWidth / 2, //300, //window.innerWidth,
-      height: 1000 * (window.innerHeight / window.innerWidth), //window.innerHeight / 2, //300 * (window.innerHeight / window.innerWidth), //window.innerHeight,
+      width: window.innerWidth, //300, //window.innerWidth,
+      height: window.innerHeight, //300 * (window.innerHeight / window.innerWidth), //window.innerHeight,
     },
     delayMs: 100,
     shouldAnimate: false,
