@@ -18,8 +18,10 @@ uniform float uInnerRadius;
 uniform float uOuterRadius;
 uniform float uEmissionCoefficient;
 uniform float uAbsorptionCoefficient;
+uniform bool uUseInputTexture;
+uniform float uSpeedScale;
 
-uniform sampler3D diskTexture;
+uniform sampler2D uInputTexture;
 
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -273,21 +275,28 @@ vec3 rayMarch(vec3 position, vec3 direction) {
 
         float pointTheta = atan(position.z, position.x);
 
-        float speed = (uRelativisticPaths ? 2.0 : -2.0) / safeDist;
+        float speed = (uRelativisticPaths ? uSpeedScale : -uSpeedScale) / safeDist;
         float shift = uTime * speed;
         vec3 vortexPosition = vec3(safeDist * cos(pointTheta + shift), position.y, safeDist * sin(pointTheta + shift));
 
-        float noise = fbm(vortexPosition, 0.5, 4);
-        float density = (noise / 10.0 + 10.0) * (1.0 / safeDist);
-        float depth = noise / 2.0;
+        float density;
+        bool inVolume = false;
 
-        // vec3 texPos = (position + 1.0) / 2.0; // maps [-1,1] → [0,1]
-        // float dens = textureCube(diskTexture, vUv.xyz).r;
+        if (uUseInputTexture) {
+            vec2 textureCoords = (position.xz + 20.0) / 40.0;
+            density = texture(uInputTexture, textureCoords).r * 20.0;
 
-        // if (dens > 0.0) {
-        if (abs(position.y) < uDiskHeight + depth && length(position.xz) < uOuterRadius + depth && length(position.xz) > uInnerRadius + depth) {
+            inVolume = density > 0.0 && abs(position.y) < 0.2;
+        } else {
+            float noise = fbm(vortexPosition, 0.5, 4);
+            float depth = noise / 2.0;
+            density = (noise / 10.0 + 10.0) * (1.0 / safeDist);
+
+            inVolume = abs(position.y) < uDiskHeight + depth && length(position.xz) < uOuterRadius + depth && length(position.xz) > uInnerRadius + depth;
+        }
+
+        if (inVolume) {
             radiativeTransferSample(color, accumTransmittance, density, safeDist, direction, position, stepSize);
-            // return vec3(1);
         }
 
         if (uRelativisticPaths) {

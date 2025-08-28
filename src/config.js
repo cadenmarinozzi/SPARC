@@ -1,20 +1,24 @@
 import * as THREE from "three";
 
 export default {
+  debug: true,
   passes: {},
   scene: {
     initialTime: 0,
-    duration: 50000,
+    duration: 0,
     maxSteps: 600,
+    speedScale: 1,
     initialStepSize: 0.08,
     maxDistance: 40,
-    schwarzschildRadius: 1.0,
     EPS: 1e-4,
     relativisticPaths: true,
     camera: {
-      position: new THREE.Vector3(0, 0, -15),
+      position: new THREE.Vector3(0, 0, -25),
     },
     blackHole: {
+      schwarzschildRadius: 1.0,
+      useInputTexture: true,
+      inputDataPath: "/inputs/grmhd_history.h5",
       position: new THREE.Vector3(0, 0, 0),
       baseTemperature: 10000,
       emissionCoefficient: 10,
@@ -23,13 +27,13 @@ export default {
   },
   rendering: {
     resolution: {
-      width: 1920,
-      height: 1080,
+      width: 300, //window.innerWidth,
+      height: 300 * (window.innerHeight / window.innerWidth), //window.innerHeight,
     },
     delayMs: 0,
     shouldAnimate: false,
     output: {
-      save: true,
+      save: false,
       image: {
         type: "png",
       },

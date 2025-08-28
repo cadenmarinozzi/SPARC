@@ -10,7 +10,16 @@
         color: white;
       }
 
-      button {
+      .controls-container {
+        position: absolute;
+
+        top: 0;
+        left: 0;
+
+        margin: 4px;
+      }
+
+      .download-button {
         padding: 4px;
 
         border: 1px solid gray;
@@ -24,7 +33,7 @@
         transition-duration: 100ms;
       }
 
-      button:hover {
+      download-button:hover {
         transform: scale(95%);
       }
     </style>
@@ -42,8 +51,8 @@
         }
       });
     </script>
-    <div>
-      <button style="display: none">Download</button>
+    <div class="controls-container">
+      <button class="download-button" style="display: none">Download</button>
     </div>
     <script type="module" src="./src/main.js"></script>
   </body>
