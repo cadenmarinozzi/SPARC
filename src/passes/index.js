@@ -9,7 +9,6 @@ export function createDefaultConfigPasses() {
       uInputTexture: { value: null },
       uResolution: { value: null },
       uThickDisk: { value: config.scene.blackHole.thickDisk },
-      uGravitationalConstant: { value: config.scene.gravitationalConstant },
       uCameraPosition: { value: config.scene.camera.position },
       uCameraRotation: { value: config.scene.camera.rotation },
       uInputDataHeight: { value: config.scene.blackHole.inputDataHeight },
@@ -18,7 +17,7 @@ export function createDefaultConfigPasses() {
       uMaxSteps: { value: config.scene.maxSteps },
       uMaxStepSize: { value: config.scene.maxStepSize },
       uMinStepSize: { value: config.scene.minStepSize },
-
+      uBaseStepSize: { value: 0.05 },
       uMaxDistance: { value: config.scene.maxDistance },
       uLogFactor: { value: config.rendering.logFactor },
       uSchwarzschildRadius: {
@@ -33,10 +32,15 @@ export function createDefaultConfigPasses() {
       },
       uInnerRadius: {
         value:
-          config.scene.blackHole.schwarzschildRadius * 1.5 + config.scene.EPS,
+          config.scene.blackHole.schwarzschildRadius *
+            config.scene.blackHole.innerRadiusCoefficient +
+          config.scene.EPS, // * 6 for accuracy
       },
       uOuterRadius: {
-        value: config.scene.blackHole.schwarzschildRadius * 1.5 + 10,
+        value:
+          config.scene.blackHole.schwarzschildRadius *
+            config.scene.blackHole.innerRadiusCoefficient +
+          15, // * 6 for accuracy
       },
       uEmissionCoefficient: {
         value: config.scene.blackHole.emissionCoefficient,

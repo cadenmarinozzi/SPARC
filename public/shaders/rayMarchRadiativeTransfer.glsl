@@ -3,6 +3,7 @@ precision highp float;
 varying vec2 vUv;
 uniform vec2 uResolution;
 uniform float uInputDataHeight;
+uniform float uBaseStepSize;
 uniform vec3 uCameraPosition;
 uniform vec3 uCameraRotation;
 uniform bool uRelativisticPaths;
@@ -19,7 +20,6 @@ uniform float uInnerRadius;
 uniform float uOuterRadius;
 uniform float uEmissionCoefficient;
 uniform float uAbsorptionCoefficient;
-uniform float uGravitationalConstant;
 uniform bool uUseInputTexture;
 uniform float uSpeedScale;
 uniform float uBrightnessScale;
@@ -35,6 +35,7 @@ const float PI = 3.1415926535897932384626433832795;
 const float c = 3e8;
 const float h = 6.626e-34;
 const float k = 1.381e-23;
+const float G = 6.6743e-11;
 
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -241,8 +242,8 @@ void radiativeTransferSample(inout vec3 color, inout float accumTransmittance, f
     // Gravitational redshift
     float observerDist = length(uCameraPosition);
     float emitterDist = dist;
-    float gravitationalRedshift = sqrt((1.0 - (2.0 * uMass * uGravitationalConstant) / observerDist) /
-        (1.0 - (2.0 * uMass * uGravitationalConstant) / emitterDist));
+    float gravitationalRedshift = sqrt((1.0 - (2.0 * uMass * G) / observerDist) /
+        (1.0 - (2.0 * uMass * G) / emitterDist));
 
     // Orbital velocity and gamma factor
     float diskPointVelocity = clamp(sqrt(uMass / (dist - 1.0)), 0.0, 1.0);
@@ -304,7 +305,7 @@ vec3 rayMarch(vec3 position, vec3 direction) {
 
         // Step size reduction near ISCO
         float adaptiveFactor = clamp((dist - uInnerRadius) / (uOuterRadius - uInnerRadius), 0.0, 1.0);
-        stepSize = uMinStepSize + (uMaxStepSize - uMinStepSize) * pow((dist - uInnerRadius) / (uOuterRadius - uInnerRadius), 0.5);
+        stepSize = uMinStepSize + (uMaxStepSize - uMinStepSize) * pow((dist - uSchwarzschildRadius) / (uOuterRadius - uSchwarzschildRadius), 0.5);
 
         // For visual effect calculations
         float safeDist = max(dist, uInnerRadius);
