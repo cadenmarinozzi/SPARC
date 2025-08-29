@@ -9,9 +9,12 @@ const simulation = new Simulation();
 async function load() {
   simulation.initRenderer();
 
-  if (config.scene.blackHole.useInputTexture) await simulation.readInputData();
-  await simulation.createPasses();
+  if (config.scene.blackHole.useInputTexture) {
+    await simulation.readInputData();
+    simulation.warmUpTextures();
+  }
 
+  await simulation.createPasses();
   simulation.animate();
 }
 

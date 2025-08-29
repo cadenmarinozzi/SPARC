@@ -3,7 +3,6 @@ precision highp float;
 varying vec2 vUv;
 uniform vec2 uResolution;
 uniform float uInputDataHeight;
-uniform float uBaseStepSize;
 uniform vec3 uCameraPosition;
 uniform vec3 uCameraRotation;
 uniform bool uRelativisticPaths;
@@ -18,8 +17,6 @@ uniform float uDiskHeight;
 uniform float uPhotonRingRadius;
 uniform float uInnerRadius;
 uniform float uOuterRadius;
-uniform float uEmissionCoefficient;
-uniform float uAbsorptionCoefficient;
 uniform bool uUseInputTexture;
 uniform float uSpeedScale;
 uniform float uBrightnessScale;
@@ -316,7 +313,7 @@ vec3 rayMarch(vec3 position, vec3 direction) {
         if (uThickDisk) {
             float pointTheta = atan(position.z, position.x);
 
-            float speed = (uRelativisticPaths ? -uSpeedScale : uSpeedScale) / safeDist;
+            float speed = (uRelativisticPaths ? uSpeedScale : -uSpeedScale) / safeDist;
             float shift = uTime * speed;
             vec3 vortexPosition = vec3(safeDist * cos(pointTheta + shift), position.y, safeDist * sin(pointTheta + shift));
 

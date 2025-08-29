@@ -17,7 +17,6 @@ export function createDefaultConfigPasses() {
       uMaxSteps: { value: config.scene.maxSteps },
       uMaxStepSize: { value: config.scene.maxStepSize },
       uMinStepSize: { value: config.scene.minStepSize },
-      uBaseStepSize: { value: 0.05 },
       uMaxDistance: { value: config.scene.maxDistance },
       uLogFactor: { value: config.rendering.logFactor },
       uSchwarzschildRadius: {
@@ -34,19 +33,13 @@ export function createDefaultConfigPasses() {
         value:
           config.scene.blackHole.schwarzschildRadius *
             config.scene.blackHole.innerRadiusCoefficient +
-          config.scene.EPS, // * 6 for accuracy
+          config.scene.EPS,
       },
       uOuterRadius: {
         value:
           config.scene.blackHole.schwarzschildRadius *
             config.scene.blackHole.innerRadiusCoefficient +
-          15, // * 6 for accuracy
-      },
-      uEmissionCoefficient: {
-        value: config.scene.blackHole.emissionCoefficient,
-      },
-      uAbsorptionCoefficient: {
-        value: config.scene.blackHole.absorptionCoefficient,
+          15,
       },
       uBrightnessScale: {
         value: config.scene.brightnessScale,

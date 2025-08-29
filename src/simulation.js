@@ -8,7 +8,8 @@ import { readH5File } from "./IO/hdf5";
 
 export default class Simulation {
   constructor() {
-    this.timeElapsed = config.scene.initialTime;
+    this.simulationTime = config.scene.initialTime;
+    this.timeStep = (1 / 60) * MS_IN_SECOND;
     this.timeIndex = 0;
 
     this.windowWidth = config.rendering.resolution.width;
@@ -95,7 +96,7 @@ export default class Simulation {
   initRenderer = () => {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.renderer = new THREE.WebGLRenderer({
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: config.rendering.output.save,
     });
 
     this.renderer.setSize(this.windowWidth, this.windowHeight);
@@ -135,9 +136,52 @@ export default class Simulation {
     downloadButton.addEventListener("click", this.download);
   };
 
+  warmUpTextures = () => {
+    const gl = this.renderer.getContext();
+
+    for (const tex of this.timeTextures) {
+      try {
+        if (this.renderer.initTexture) this.renderer.initTexture(tex);
+      } catch (e) {
+        const dummyMat = new THREE.MeshBasicMaterial({ map: tex });
+        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dummyMat);
+        const scene = new THREE.Scene();
+        scene.add(quad);
+
+        this.renderer.setRenderTarget(this.combineRenderTarget);
+        this.renderer.clear();
+        this.renderer.render(scene, this.camera);
+
+        dummyMat.dispose();
+        quad.geometry.dispose();
+      }
+    }
+
+    if (gl && gl.finish) gl.finish();
+  };
+
+  canvasToDataURL = (imageType) => {
+    return new Promise((resolve, reject) => {
+      const mime = `image/${imageType}`;
+
+      this.renderer.domElement.toBlob((blob) => {
+        if (!blob) return reject(new Error("toBlob produced no blob"));
+
+        const reader = new FileReader();
+        reader.onerror = (err) => reject(err);
+        reader.onloadend = () => {
+          resolve(reader.result);
+        };
+        reader.readAsDataURL(blob);
+      }, mime);
+    });
+  };
+
   handleRenderPass = (pass) => {
-    const { renderTarget, scene, material, isCombine } = pass;
-    const timeSeconds = this.timeElapsed / MS_IN_SECOND;
+    const { renderTarget, scene, material, name } = pass;
+    const timeSeconds = this.simulationTime / MS_IN_SECOND;
+
+    if (config.debug) console.log(`Rendering pass: ${name}`);
 
     if (material.uniforms.uTime) {
       material.uniforms.uTime.value = timeSeconds;
@@ -146,37 +190,17 @@ export default class Simulation {
     if (
       config.scene.blackHole.useInputTexture &&
       this.timeIndex < this.nTimeFrames &&
-      material.uniforms.uInputTexture &&
-      material.uniforms.uInputTexture !== this.timeTextures[this.timeIndex]
+      material.uniforms.uInputTexture
     ) {
       material.uniforms.uInputTexture.value = this.timeTextures[this.timeIndex];
     }
 
-    if (
-      material.uniforms.uResolution &&
-      material.uniforms.uResolution.value !== this.resolution
-    ) {
+    if (material.uniforms.uResolution) {
       material.uniforms.uResolution.value = this.resolution;
     }
 
-    if (isCombine) {
-      for (const {
-        name: otherName,
-        renderTarget: otherRenderTarget,
-        isCombine: otherIsCombine,
-      } of this.passes) {
-        if (otherIsCombine) continue;
-
-        material.uniforms[`t${otherName}`].value = otherRenderTarget.texture;
-      }
-
-      this.renderer.setRenderTarget(null);
-      this.renderer.render(scene, this.camera);
-
-      return;
-    }
-
     this.renderer.setRenderTarget(renderTarget);
+    this.renderer.clear(true, true, true);
     this.renderer.render(scene, this.camera);
   };
 
@@ -185,12 +209,42 @@ export default class Simulation {
     this.timeIndex++;
 
     for (const pass of this.passes) {
-      this.handleRenderPass(pass);
+      if (!pass.isCombine) this.handleRenderPass(pass);
+    }
 
-      if (config.rendering.shouldAnimate && config.rendering.output.save) {
-        const imageType = config.rendering.output.video.imageType;
-        const frame = this.renderer.domElement.toDataURL(`image/${imageType}`);
-        this.frames.push(frame);
+    const combinePass = this.passes.find(({ isCombine }) => isCombine);
+
+    if (combinePass) {
+      for (const {
+        name: otherName,
+        renderTarget: otherRenderTarget,
+        isCombine: otherIsCombine,
+      } of this.passes) {
+        if (otherIsCombine) continue;
+
+        combinePass.material.uniforms[`t${otherName}`].value =
+          otherRenderTarget.texture;
+      }
+
+      this.renderer.setRenderTarget(null);
+      this.renderer.clear(true, true, true);
+      this.renderer.render(combinePass.scene, this.camera);
+    }
+
+    const gl = this.renderer.getContext();
+
+    if (gl && gl.finish) {
+      gl.finish();
+    }
+
+    if (config.rendering.shouldAnimate && config.rendering.output.save) {
+      const imageType = config.rendering.output.video.imageType;
+
+      try {
+        const dataUrl = await this.canvasToDataURL(imageType);
+        this.frames.push(dataUrl);
+      } catch (err) {
+        console.error("Failed to save frame:", err);
       }
     }
 
@@ -201,39 +255,25 @@ export default class Simulation {
       console.log(`Frame took ${deltaTime / MS_IN_SECOND} seconds to render`);
   };
 
-  animate = (t = this.timeElapsed) => {
-    this.timeElapsed = t;
+  animate = () => {
+    this.simulationTime += this.timeStep;
     this.render();
 
     const finished =
-      (config.scene.duration && t >= config.scene.duration) ||
+      (config.scene.duration &&
+        this.simulationTime - config.scene.initialTime >=
+          config.scene.duration) ||
       !config.rendering.shouldAnimate;
 
     if (finished) {
       this.handleAnimationFinished();
 
       if (config.debug)
-        console.log(`Finished. Time elapsed: ${this.timeElapsed}`);
+        console.log(`Finished. Simulation time: ${this.simulationTime}`);
 
       return;
     }
 
-    const delayMs = config.rendering.delayMs;
-
-    if (delayMs && delayMs > 0) {
-      const nextFrame = t + delayMs;
-
-      const loop = (t) => {
-        if (t >= nextFrame) {
-          this.animate(t);
-        } else {
-          requestAnimationFrame(loop);
-        }
-      };
-
-      requestAnimationFrame(loop);
-    } else {
-      requestAnimationFrame((t) => this.animate(t + config.scene.initialTime));
-    }
+    requestAnimationFrame(this.animate);
   };
 }
