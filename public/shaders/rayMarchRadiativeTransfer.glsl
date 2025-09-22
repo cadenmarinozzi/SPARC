@@ -26,6 +26,9 @@ uniform float uMinStepSize;
 uniform bool uThickDisk;
 uniform sampler2D uInputTexture;
 uniform float uLogFactor;
+uniform bool uLogColor;
+uniform bool uGammaColor;
+uniform float uGammaFactor;
 
 // Universal constants
 const float PI = 3.1415926535897932384626433832795;
@@ -174,6 +177,7 @@ vec3 blackbodyRedshifted(float T, float redshift) {
 
 // normalize for visualization
     float maxI = max(max(BR, BG), BB);
+
     return vec3(BR, BG, BB) / maxI;
 }
 
@@ -354,6 +358,13 @@ vec3 linearToLog(vec3 color, float a) {
     return log(1.0 + a * color) / log(1.0 + a);
 }
 
+// G: Gamma value
+vec3 gammaCorrect(vec3 color, float G) {
+    color = pow(color, vec3(1.0 / G));
+
+    return color;
+}
+
 void main() {
     vec2 uv = vec2((vUv.x - 0.5) * (uResolution.x / uResolution.y), (vUv.y - 0.5));
 
@@ -361,7 +372,14 @@ void main() {
     vec3 direction = normalize(rotate(vec3(uv, 1), uCameraRotation));
 
     vec3 color = rayMarch(position, direction);
-    vec3 logColor = linearToLog(color, uLogFactor);
 
-    gl_FragColor = vec4(logColor, 1);
+    if (uLogColor) {
+        color = linearToLog(color, uLogFactor);
+    }
+
+    if (uGammaColor) {
+        color = gammaCorrect(color, uGammaFactor);
+    }
+
+    gl_FragColor = vec4(color, 1);
 }

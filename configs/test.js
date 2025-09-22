@@ -17,24 +17,42 @@ export default {
     observerFrequency: 0.0015,
     camera: {
       position: new THREE.Vector3(0, 0, -25),
-      rotation: new THREE.Vector3(0.5, 0, 0),
+      rotation: new THREE.Vector3(0.2, 0, 0),
     },
     blackHole: {
       innerRadiusCoefficient: 3,
       diskHeight: 0.4,
       schwarzschildRadius: 1,
       useInputTexture: false,
-      thickDisk: true,
+      thickDisk: false,
       inputDataHeight: 0.2,
       inputDataPath: "/inputs/grmhd_history.h5",
-      baseTemperature: 3000,
+      baseTemperature: 10000,
+    },
+    animation: {
+      start: {
+        camera: {
+          position: [0, 0, -25],
+          rotation: [0.5, 0, 0],
+        },
+      },
+      end: {
+        camera: {
+          position: [0, 0, -20],
+          rotation: [-0.1, 0, 0],
+        },
+      },
+      stepSize: 0.001,
     },
   },
   rendering: {
+    logColor: true,
+    gammaColor: false,
+    gammaFactor: 2.2,
     logFactor: 5,
     resolution: {
-      width: 1000,
-      height: 1000 * (window.innerHeight / window.innerWidth),
+      width: 1920,
+      height: 1920 * (window.innerHeight / window.innerWidth),
     },
     shouldAnimate: false,
     output: {

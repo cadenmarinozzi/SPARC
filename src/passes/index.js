@@ -32,6 +32,7 @@ export function createDefaultConfigPasses() {
       uInnerRadius: {
         value:
           config.scene.blackHole.schwarzschildRadius *
+            1.5 *
             config.scene.blackHole.innerRadiusCoefficient +
           config.scene.EPS,
       },
@@ -47,6 +48,9 @@ export function createDefaultConfigPasses() {
       uObserverFrequency: {
         value: config.scene.observerFrequency,
       },
+      uGammaFactor: { value: config.rendering.gammaFactor },
+      uLogColor: { value: config.rendering.logColor },
+      uGammaColor: { value: config.rendering.gammaColor },
       uTime: { value: null },
     },
   });

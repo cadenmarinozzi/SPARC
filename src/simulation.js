@@ -5,6 +5,7 @@ import config from "./config";
 import { MS_IN_SECOND } from "./constants";
 import { fetchShader } from "./IO/assets";
 import { readH5File } from "./IO/hdf5";
+import { linearInterpolate3 } from "./utils";
 
 export default class Simulation {
   constructor() {
@@ -28,6 +29,13 @@ export default class Simulation {
     this.timeTextures = [];
 
     this.passes = [];
+
+    this.state = {
+      camera: {
+        position: config.scene.camera.position.clone(),
+        rotation: config.scene.camera.rotation.clone(),
+      },
+    };
   }
 
   createPasses = async () => {
@@ -255,9 +263,49 @@ export default class Simulation {
       console.log(`Frame took ${deltaTime / MS_IN_SECOND} seconds to render`);
   };
 
+  updateState = () => {
+    if (!config.scene.animation) return;
+
+    const currentCameraPosition = linearInterpolate3(
+      config.scene.animation.start.camera.position,
+      config.scene.animation.end.camera.position,
+      (this.simulationTime - config.scene.initialTime) / config.scene.duration
+    );
+
+    const currentCameraRotation = linearInterpolate3(
+      config.scene.animation.start.camera.rotation,
+      config.scene.animation.end.camera.rotation,
+      // 1
+      (this.simulationTime - config.scene.initialTime) / config.scene.duration
+    );
+
+    this.state.camera.position = currentCameraPosition;
+    this.state.camera.rotation = currentCameraRotation;
+
+    for (const pass of this.passes) {
+      if (pass.material.uniforms.uCameraPosition?.value) {
+        pass.material.uniforms.uCameraPosition.value = new THREE.Vector3(
+          this.state.camera.position[0],
+          this.state.camera.position[1],
+          this.state.camera.position[2]
+        );
+      }
+
+      if (pass.material.uniforms.uCameraRotation?.value) {
+        pass.material.uniforms.uCameraRotation.value = new THREE.Vector3(
+          this.state.camera.rotation[0],
+          this.state.camera.rotation[1],
+          this.state.camera.rotation[2]
+        );
+      }
+    }
+  };
+
   animate = () => {
     this.simulationTime += this.timeStep;
+
     this.render();
+    this.updateState();
 
     const finished =
       (config.scene.duration &&
