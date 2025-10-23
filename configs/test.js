@@ -24,7 +24,7 @@ export default {
       diskHeight: 0.4,
       schwarzschildRadius: 1,
       useInputTexture: false,
-      thickDisk: false,
+      thickDisk: true,
       inputDataHeight: 0.2,
       inputDataPath: "/inputs/grmhd_history.h5",
       baseTemperature: 10000,
